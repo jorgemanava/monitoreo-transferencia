@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transferencia automática residencial</title>
+<style>
+:root{--bg:#eef3fa;--panel:#ffffff;--panel2:#f3f6fb;--line:#d5dfee;--txt:#1d2a3f;--mut:#6a7b96;
+--red:#0fa593;--pla:#e8930c;--off:#aab6c9;--bad:#e0384b}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,sans-serif;min-height:100vh;padding:16px;
+background-image:radial-gradient(circle at 15% 0,#dbe8fb 0,transparent 45%)}
+.wrap{max-width:980px;margin:auto;display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+h1{font-size:1.35rem}
+h1 small{display:block;font-size:.8rem;font-weight:400;color:var(--mut)}
+.hr{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.badge{padding:6px 12px;border-radius:99px;background:var(--panel);border:1px solid var(--line);font-size:.85rem;display:flex;gap:8px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--off)}
+.badge.ok .dot{background:var(--red);box-shadow:0 0 8px var(--red)}
+.badge.err .dot{background:var(--bad)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 2px 10px -4px #2a4a7a25}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.relay{text-align:center;transition:border-color .3s,box-shadow .3s;--c:var(--off)}
+.relay h2{font-size:1rem;color:var(--mut);font-weight:600}
+.relay.on.red{--c:var(--red);border-color:var(--red);box-shadow:0 6px 26px -10px var(--red)}
+.relay.on.pla{--c:var(--pla);border-color:var(--pla);box-shadow:0 6px 26px -10px var(--pla)}
+.lamp{width:110px;height:110px;margin:14px auto;border-radius:50%;display:grid;place-items:center;font-size:2.6rem;
+background:radial-gradient(circle,#fff,var(--panel2));border:4px solid var(--c);transition:.35s}
+.relay.on .lamp{box-shadow:0 0 26px -2px var(--c);animation:pulse 2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 42px 2px var(--c)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.state{font-size:1.5rem;font-weight:700;color:var(--c)}
+.sub{color:var(--mut);font-size:.85rem;margin-top:4px}
+.flow{--ico:72px;display:flex;align-items:flex-start;justify-content:center;flex-wrap:nowrap;padding-top:10px}
+.node{text-align:center;font-size:.9rem;color:var(--mut);min-width:84px}
+.node b{display:block;font-size:1.8rem;filter:grayscale(1) opacity(.45);transition:.3s}
+.node.act b{filter:none}
+/* Contactos del diagrama: abierto = cuchilla levantada y cable gris; cerrado = cuchilla apoyada, color y brillo.
+   cl = contacto cerrado, fl = hay corriente (brillo y flujo), nd = sin datos, rev = la fuente esta a la derecha */
+.link{flex:1;min-width:0;max-width:260px;--c:var(--off);--abierto:#8393ad}
+.link.red{--c:var(--red)}.link.pla{--c:var(--pla)}
+.link .cx{height:calc(var(--ico) + 2px);display:flex;align-items:center}
+.link .hilo{flex:1;min-width:4px;height:4px;border-radius:2px;background:var(--abierto);opacity:.55;transition:background-color .3s,opacity .3s}
+.link .sw{display:block;flex:none;width:60px;height:90px;overflow:visible}
+.link .stub{fill:none;stroke:var(--abierto);stroke-width:2.6;opacity:.55;transition:stroke .3s,opacity .3s}
+.link .term{fill:var(--panel);stroke:var(--abierto);stroke-width:2.2;transition:stroke .3s}
+.link .blade{stroke:var(--abierto);stroke-width:3.4;stroke-linecap:round;transform-origin:6px 20px;transform:rotate(-32deg);
+transition:transform .45s cubic-bezier(.34,1.45,.5,1),stroke .3s}
+.link.rev .blade{transform-origin:34px 20px;transform:rotate(32deg)}
+.link.cl .blade{stroke:var(--c);transform:rotate(0)}
+.link.cl .term{stroke:var(--c)}
+.link.cl .stub{stroke:var(--c);opacity:1}
+.link.cl .hilo{background:var(--c);opacity:1}
+.link.fl .cx{filter:drop-shadow(0 0 3px var(--c)) drop-shadow(0 0 8px var(--c))}
+.link.fl .hilo{background:repeating-linear-gradient(90deg,var(--c) 0 9px,transparent 9px 18px);background-size:18px 4px;animation:fluir .7s linear infinite}
+.link.fl.rev .hilo{animation-direction:reverse}
+@keyframes fluir{to{background-position:18px 0}}
+.link.nd{opacity:.55}
+.link .lbl{display:block;text-align:center;font-size:.8rem;line-height:1.25;color:var(--mut);white-space:nowrap}
+.link .lbl i{display:block;font-style:normal}
+.link .lbl b{display:block;font-weight:700;color:var(--abierto);transition:color .3s}
+.link.cl .lbl b{color:var(--c)}
+@media(max-width:560px){.flow{--ico:52px}.node{min-width:56px;font-size:.8rem}.link .sw{width:38px;height:57px}.link .hilo{height:3px}.link .lbl{font-size:.72rem}}
+#src{text-align:center;margin-top:12px;font-weight:600}
+.hm{text-align:center}
+.card h3{font-size:.95rem;margin-bottom:6px}
+.digits{display:flex;justify-content:center;align-items:center;gap:6px;margin:14px 0;font-variant-numeric:tabular-nums}
+.d{background:var(--panel2);border:1px solid var(--line);border-radius:8px;width:clamp(28px,7vw,48px);height:clamp(42px,10vw,68px);
+display:grid;place-items:center;font-size:clamp(1.5rem,5vw,2.6rem);font-weight:700;font-family:Consolas,monospace}
+.run .d{color:var(--pla);border-color:#f3cf8f;background:#fff8ea}
+.sep{font-size:2rem;color:var(--mut)}
+.units{display:flex;justify-content:center;gap:clamp(60px,20vw,150px);color:var(--mut);font-size:.75rem;margin-top:-6px}
+.pill{display:inline-block;padding:4px 12px;border-radius:99px;background:var(--panel2);font-size:.85rem;margin-top:10px;color:var(--mut)}
+.run .pill{background:#ffefcf;color:#b06a00}
+.stats{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;margin-top:14px}
+.stats div{font-size:.8rem;color:var(--mut)}.stats b{display:block;font-size:1.2rem;color:var(--txt);font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);padding:9px 14px;border-radius:10px;transition:.15s}
+button:hover{border-color:var(--mut);transform:translateY(-1px)}
+button.prim{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+button:focus-visible,input:focus-visible{outline:2px solid #2b6cd9;outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+input[type=text],input[type=password]{background:#fff;border:1px solid var(--line);color:var(--txt);padding:9px;border-radius:10px;flex:1;min-width:180px;font:inherit}
+.field{display:grid;gap:5px;flex:1;min-width:220px;font-size:.8rem;color:var(--mut)}
+.field input{width:100%}
+#log{list-style:none;padding:0;max-height:190px;overflow:auto;font-size:.85rem}
+#log li{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+#log time{color:var(--mut);font-variant-numeric:tabular-nums}
+#log .empty{color:var(--mut)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translate(-50%,80px);background:#1d2a3f;color:#fff;padding:10px 18px;border-radius:10px;transition:.3s;opacity:0;font-weight:600}
+#toast.show{transform:translate(-50%,0);opacity:1}
+.tiny{font-size:.75rem;color:var(--mut)}
+code{background:var(--panel2);padding:1px 5px;border-radius:5px}
+/* --- Modo administrador, secciones plegables y confirmaciones --- */
+[hidden]{display:none!important}
+.badge.btn{font:inherit;font-size:.85rem;color:var(--txt)}
+.badge.btn:hover{border-color:var(--mut);transform:none}
+.badge.btn.on{background:var(--txt);color:#fff;border-color:var(--txt)}
+.badge.btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+dialog{width:min(420px,calc(100vw - 32px));margin:auto;border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--panel);color:var(--txt);box-shadow:0 18px 50px -12px #1d2a3f55}
+dialog::backdrop{background:#1d2a3f66}
+dialog h3{margin-bottom:4px}
+.err{color:var(--bad);min-height:1.2em;margin-top:8px}
+.admhead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+.card h4{font-size:.9rem;margin-bottom:4px}
+details.acc{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 14px}
+details.acc[open]{padding-bottom:14px}
+summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;font-size:.95rem}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";flex:none;width:8px;height:8px;margin:0 4px 3px 0;border-right:2px solid var(--mut);border-bottom:2px solid var(--mut);transform:rotate(45deg);transition:transform .2s}
+details[open]>summary::after{transform:rotate(-135deg);margin-bottom:-3px}
+summary:focus-visible{outline:2px solid #2b6cd9;outline-offset:2px;border-radius:8px}
+summary .t{flex:1}
+.count{background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:1px 9px;margin-left:6px;font-size:.78rem;font-weight:600;color:var(--mut);font-variant-numeric:tabular-nums}
+.hint{font-size:.8rem;font-weight:400;color:var(--mut)}
+.hint::after{content:"Mostrar"}
+details[open]>summary .hint::after{content:"Minimizar"}
+.box{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:14px}
+button.danger{border-color:var(--bad);color:var(--bad);background:#fff}
+button.danger.fill{background:var(--bad);color:#fff}
+#resetConfirm{margin-top:12px;padding:14px;border:1px solid var(--bad);border-radius:12px;background:#fff5f6}
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;font-size:.9rem;cursor:pointer}
+.chk input{width:20px;height:20px;flex:none}
+#log.big{max-height:460px}
+/* --- Iconos propios (torre de alta tension, casa con rayo, generador) --- */
+.ico{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ico.sm{stroke-width:3.2}
+.lamp .ico{width:58px;height:58px;color:var(--c);transition:color .35s}
+.node b{color:var(--off);filter:none}
+.node b .ico{width:var(--ico,46px);height:var(--ico,46px);stroke-width:1.9;display:block;margin:0 auto 2px}
+.node.act b{color:var(--txt)}
+#nRed.act b{color:var(--red)}
+#nPla.act b{color:var(--pla)}
+.pla.on,#nPla.act{--giro:3s}
+#src .ico{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
+.lic{width:18px;height:18px;margin-top:1px}
+.lic.on{color:var(--red)}.lic.pla{color:var(--pla)}.lic.bad{color:var(--bad)}.lic.off{color:var(--off)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- Red: torre de alta tension con cruceta, aisladores y cables -->
+    <symbol id="i-red" viewBox="0 0 48 48">
+      <path d="M24 2.5V9"/>
+      <path d="M15 11H33M15 11V15M33 11V15"/>
+      <path d="M10 21H38M10 21V25M38 21V25"/>
+      <path d="M21 9 15 45M27 9 33 45"/>
+      <path d="M17 33H31M15 45H33"/>
+      <path d="M19 21 31 33M29 21 17 33"/>
+      <path d="M15 15Q8 18 2 15M33 15Q40 18 46 15M10 25Q5 28 1 25M38 25Q43 28 47 25"/>
+    </symbol>
+    <!-- Casa: tejado con chimenea y rayo adentro (casa con energia) -->
+    <symbol id="i-casa" viewBox="0 0 48 48">
+      <path d="M5 22 24 6 43 22"/>
+      <path d="M34 13V8H38V16"/>
+      <path d="M10 19V42H38V19"/>
+      <path d="M26 21 19 31H24.5L22 40 30 28H24.5Z"/>
+    </symbol>
+    <!-- Planta: generador con asa, volante (gira cuando esta encendida) y rayo -->
+    <symbol id="i-planta" viewBox="0 0 48 48">
+      <path d="M9 17V9H39V17"/>
+      <rect x="6" y="17" width="36" height="21" rx="2.5"/>
+      <path d="M11 38V44M37 38V44M7 44H15M33 44H41"/>
+      <circle cx="17" cy="27.5" r="6.5"/>
+      <g style="transform-box:fill-box;transform-origin:center;animation:spin var(--giro,0s) linear infinite"><path d="M17 22V33M11.5 27.5H22.5"/></g>
+      <path d="M32 21 28 28.5H31.5L30 34.5 36 26.5H32.5Z"/>
+    </symbol>
+  </defs>
+</svg>
+<div class="wrap">
+
+<header>
+  <h1>Transferencia automática residencial<small>Monitor de estado de red y planta</small></h1>
+  <div class="hr">
+    <span class="badge" id="conn"><span class="dot"></span><span id="connTxt">Sin conectar</span></span>
+    <span class="badge" id="espConn"><span class="dot"></span><span id="espTxt">ESP32: sin datos</span></span>
+    <button type="button" class="badge btn" id="bAdmin" aria-haspopup="dialog"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg><span id="adminTxt">Administrador</span></button>
+  </div>
+</header>
+
+<section class="card" id="admin" hidden aria-label="Panel de administrador">
+  <div class="admhead">
+    <h3>Panel de administrador</h3>
+    <button type="button" id="bSalir">Salir del modo administrador</button>
+  </div>
+
+  <details class="acc" id="accMqtt">
+    <summary><span class="t">Conexión MQTT con HiveMQ Cloud</span></summary>
+    <div class="row" style="margin-top:2px">
+      <label class="field">WebSocket seguro
+        <input type="text" id="url" value="wss://3a382a71a566480d88db7617a4afbc8b.s1.eu.hivemq.cloud:8884/mqtt" spellcheck="false" autocomplete="off">
+      </label>
+      <label class="field">ID del ESP32 (opcional)
+        <input type="text" id="deviceId" placeholder="esp32-ups-... (o detección automática)" spellcheck="false" autocomplete="off">
+      </label>
+    </div>
+    <div class="row">
+      <label class="field">Usuario MQTT
+        <input type="text" id="mqttUser" placeholder="usuario del broker" autocomplete="username" autocapitalize="none" spellcheck="false">
+      </label>
+      <label class="field">Contraseña MQTT
+        <input type="password" id="mqttPass" autocomplete="current-password">
+      </label>
+    </div>
+    <label class="chk"><input type="checkbox" id="recordar" checked> Mantener conectado en este navegador</label>
+    <p class="tiny">Guarda el usuario y la contraseña solo en este navegador y la página se conecta sola cada vez que se abre. «Desconectar» los borra.</p>
+    <div class="row">
+      <button class="prim" id="bConn">Conectar</button>
+      <button id="bDisc">Desconectar</button>
+    </div>
+    <p class="tiny" id="deviceStatus" style="margin-top:8px">ESP32: sin datos. Escribe el ID que aparece en el Monitor serie o deja el campo vacío para detectar el primero que esté online.</p>
+    <p class="tiny" id="connError" role="status"></p>
+    <p class="tiny">Se leen <code>ups/&lt;id&gt;/red</code>, <code>ups/&lt;id&gt;/planta</code> y <code>ups/&lt;id&gt;/disponibilidad</code>. La conexión sigue activa aunque salgas del modo administrador.</p>
+  </details>
+
+  <div class="box">
+    <h4>Contador de la planta</h4>
+    <p class="tiny">Pone en cero las horas de funcionamiento, los arranques y los ciclos.</p>
+    <div class="row"><button type="button" class="danger" id="bReset">Reiniciar contador</button></div>
+    <div id="resetConfirm" hidden role="alertdialog" aria-labelledby="rcTitulo" aria-describedby="rcDetalle">
+      <p id="rcTitulo"><b>¿Seguro que quieres borrar el contador?</b></p>
+      <p class="tiny" id="rcDetalle"></p>
+      <label class="chk"><input type="checkbox" id="chkHist" checked> También borrar el historial de eventos</label>
+      <div class="row" style="margin-top:4px">
+        <button type="button" class="danger fill" id="bResetSi">Sí, borrar</button>
+        <button type="button" id="bResetNo">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="grid">
+  <div class="card relay red" id="cRed" role="status" aria-label="Estado de la red">
+    <h2>Red eléctrica · Relé 1</h2>
+    <div class="lamp"><span class="ic"><svg class="ico" aria-hidden="true"><use href="#i-red"/></svg></span></div>
+    <div class="state" id="tRed">SIN DATOS</div>
+    <div class="sub" id="sRed">Relé 1: --</div>
+  </div>
+  <div class="card relay pla" id="cPla" role="status" aria-label="Estado de la planta">
+    <h2>Planta eléctrica · Relé 2</h2>
+    <div class="lamp"><span class="ic"><svg class="ico" aria-hidden="true"><use href="#i-planta"/></svg></span></div>
+    <div class="state" id="tPla">SIN DATOS</div>
+    <div class="sub" id="sPla">Relé 2: --</div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="flow" aria-hidden="true">
+    <div class="node" id="nRed"><b><svg class="ico" aria-hidden="true"><use href="#i-red"/></svg></b>Red</div>
+    <div class="link red" id="kRed">
+      <div class="cx"><i class="hilo"></i><svg class="sw" viewBox="0 -10 40 60" focusable="false"><line class="stub" x1="0" y1="20" x2="6" y2="20"/><line class="stub" x1="34" y1="20" x2="40" y2="20"/><line class="blade" x1="6" y1="20" x2="34" y2="20"/><circle class="term" cx="6" cy="20" r="3.8"/><circle class="term" cx="34" cy="20" r="3.8"/></svg><i class="hilo"></i></div>
+      <span class="lbl"><i>Relé 1</i><b id="lRed">sin datos</b></span>
+    </div>
+    <div class="node act" id="nCasa"><b><svg class="ico" aria-hidden="true"><use href="#i-casa"/></svg></b>Casa</div>
+    <div class="link pla rev" id="kPla">
+      <div class="cx"><i class="hilo"></i><svg class="sw" viewBox="0 -10 40 60" focusable="false"><line class="stub" x1="0" y1="20" x2="6" y2="20"/><line class="stub" x1="34" y1="20" x2="40" y2="20"/><line class="blade" x1="6" y1="20" x2="34" y2="20"/><circle class="term" cx="6" cy="20" r="3.8"/><circle class="term" cx="34" cy="20" r="3.8"/></svg><i class="hilo"></i></div>
+      <span class="lbl"><i>Relé 2</i><b id="lPla">sin datos</b></span>
+    </div>
+    <div class="node" id="nPla"><b><svg class="ico" aria-hidden="true"><use href="#i-planta"/></svg></b>Planta</div>
+  </div>
+  <div id="src" aria-live="polite"></div>
+</section>
+
+<section class="card hm" id="hm">
+  <h3>⏱ Horas de funcionamiento de la planta</h3>
+  <div class="digits" id="digits"></div>
+  <div class="units"><span>horas</span><span>min</span><span>seg</span></div>
+  <span class="pill" id="hmState">⏸ Detenido</span>
+  <div class="stats">
+    <div>Arranques<b id="nStart">0</b></div>
+    <div>Último ciclo<b id="nLast">00:00:00</b></div>
+    <div>Ciclo actual<b id="nCur">00:00:00</b></div>
+  </div>
+  <p class="tiny">Estimación local: el tiempo solo se contabiliza mientras esta página recibe datos del ESP32.</p>
+</section>
+
+<section class="card">
+  <details id="accLog" open>
+    <summary><span class="t">Historial de eventos <span class="count" id="logCount">0</span></span><span class="hint"></span></summary>
+    <ul id="log"><li class="empty">Sin eventos todavía.</li></ul>
+    <div class="row">
+      <button id="bClear">Limpiar historial</button>
+      <button type="button" id="bAmpliar" aria-pressed="false">Ampliar</button>
+    </div>
+  </details>
+</section>
+
+</div>
+<div id="toast" role="status"></div>
+
+<dialog id="dlgLogin" aria-labelledby="loginTitulo">
+  <form id="fLogin" autocomplete="on">
+    <h3 id="loginTitulo">Acceso de administrador</h3>
+    <p class="tiny">Escribe el usuario y la contraseña de administrador.</p>
+    <div class="row" style="flex-direction:column">
+      <label class="field">Usuario
+        <input type="text" id="admUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label class="field">Contraseña
+        <input type="password" id="admPass" autocomplete="current-password" required>
+      </label>
+      <label class="chk"><input type="checkbox" id="verClave"> Mostrar contraseña</label>
+    </div>
+    <p class="tiny err" id="loginMsg" role="alert"></p>
+    <div class="row">
+      <button type="submit" class="prim" id="bEntrar">Entrar</button>
+      <button type="button" id="bCancelarLogin">Cancelar</button>
+    </div>
+    <p class="tiny" id="verInfo" style="margin-top:12px"></p>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const pad=(n,l=2)=>String(n).padStart(l,"0");
+const fmt=ms=>{const s=Math.floor(ms/1000);return pad(Math.floor(s/3600),3)+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60)};
+const fmt2=ms=>fmt(ms).slice(1);
+// El ESP32 publica red y planta cada 1 s. Si no llega ningun mensaje suyo en este
+// tiempo se da por desconectado, sin esperar el aviso "offline" del broker, que
+// con un corte de luz o de Wi-Fi tarda ~45 s en publicarse.
+const STALE_MS=8000;
+let S={conn:false,broker:false,online:false,lastMsg:0,known:{red:false,planta:false},deviceId:"",
+  red:false,planta:false,acc:0,arr:0,last:0,since:0};
+try{const g=JSON.parse(localStorage.getItem("horometro"));if(g)Object.assign(S,{acc:g.acc||0,arr:g.arr||0,last:g.last||0})}catch(e){}
+const save=()=>{try{localStorage.setItem("horometro",JSON.stringify({acc:S.acc,arr:S.arr,last:S.last}))}catch(e){}};
+const logEl=$("log"),SVGNS="http://www.w3.org/2000/svg";
+// Icono propio del sprite del inicio de la pagina: id = red | casa | planta
+function icono(id,clase){
+  const svg=document.createElementNS(SVGNS,"svg"),use=document.createElementNS(SVGNS,"use");
+  svg.setAttribute("class","ico "+clase);svg.setAttribute("aria-hidden","true");
+  use.setAttribute("href","#i-"+id);svg.appendChild(use);return svg;
+}
+function contarLog(){$("logCount").textContent=logEl.querySelectorAll("li:not(.empty)").length}
+function limpiarLog(){logEl.innerHTML='<li class="empty">Sin eventos todavía.</li>';contarLog()}
+function log(msg,ic,tono){
+  const empty=logEl.querySelector(".empty");if(empty)empty.remove();
+  const li=document.createElement("li"),time=document.createElement("time"),span=document.createElement("span");
+  time.textContent=new Date().toLocaleTimeString();span.textContent=msg;
+  li.append(time);
+  if(ic)li.append(icono(ic,"sm lic "+(tono||"")));
+  li.append(span);logEl.prepend(li);
+  while(logEl.children.length>200)logEl.lastElementChild.remove();
+  contarLog();
+}
+let tt;function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2200)}
+const dg=$("digits");
+"000:00:00".split("").forEach(c=>{const s=document.createElement("span");s.className=c===":"?"sep":"d";s.textContent=c;dg.appendChild(s)});
+function currentMs(){return S.conn&&S.planta&&S.since?Math.max(0,Date.now()-S.since):0}
+function drawTime(){
+  const cur=currentMs(),str=fmt(S.acc+cur);
+  [...dg.children].forEach((el,i)=>{if(el.textContent!==str[i])el.textContent=str[i]});
+  $("nCur").textContent=fmt2(cur);
+}
+function pauseCounter(at){if(S.planta&&S.since){S.acc+=Math.max(0,(at||Date.now())-S.since);S.since=0;save()}}
+function syncReady(){
+  const ready=S.broker&&S.online&&S.known.red&&S.known.planta;
+  if(S.conn&&!ready)pauseCounter();
+  S.conn=ready;
+  if(ready&&S.planta&&!S.since)S.since=Date.now();
+  render();
+}
+function render(){
+  const c=S.conn;
+  $("cRed").classList.toggle("on",c&&S.red);$("cPla").classList.toggle("on",c&&S.planta);
+  $("tRed").textContent=!c?"SIN DATOS":S.red?"ENCENDIDA":"APAGADA";
+  $("sRed").textContent="Relé 1: "+(!c?"--":S.red?"ON":"OFF");
+  $("tPla").textContent=!c?"SIN DATOS":S.planta?"ENCENDIDA":"APAGADA";
+  $("sPla").textContent="Relé 2: "+(!c?"--":S.planta?"ON":"OFF");
+  $("nRed").classList.toggle("act",c&&S.red);$("nPla").classList.toggle("act",c&&S.planta);
+  // Contacto cerrado = rele en ON. Hay corriente (brillo y flujo) si ese contacto alimenta la casa:
+  // la red siempre; la planta solo si la red no esta (si ambas estan en ON se avisa abajo).
+  $("kRed").className="link red"+(c&&S.red?" cl fl":"")+(c?"":" nd");
+  $("kPla").className="link pla rev"+(c&&S.planta?" cl":"")+(c&&S.planta&&!S.red?" fl":"")+(c?"":" nd");
+  $("lRed").textContent=!c?"sin datos":S.red?"cerrado":"abierto";
+  $("lPla").textContent=!c?"sin datos":S.planta?"cerrado":"abierto";
+  const src=$("src");
+  // Solo se vuelve a escribir cuando cambia el mensaje (render() corre cada segundo y
+  // el lector de pantalla lo anunciaria una y otra vez).
+  const setSrc=(ic,txt,col)=>{
+    const key=ic+"|"+txt;if(src.dataset.k===key)return;
+    src.dataset.k=key;src.replaceChildren();if(ic)src.append(icono(ic,"sm"));src.append(txt);src.style.color=col;
+  };
+  if(!c)setSrc("","Esperando estados del ESP32","var(--mut)");
+  else if(S.red&&S.planta)setSrc("","⚠️ Red y planta indican ON simultáneamente","var(--bad)");
+  else if(S.red)setSrc("red","Red eléctrica encendida","var(--red)");
+  else if(S.planta)setSrc("planta","Planta eléctrica encendida","var(--pla)");
+  else setSrc("","⚠️ Red y planta indican OFF","var(--bad)");
+  document.title=(c&&S.planta?"● ":"")+"Transferencia automática residencial";
+  $("hm").classList.toggle("run",c&&S.planta);
+  $("hmState").textContent=!c?"⏸ Sin datos":S.planta?"▶ Contando":"⏸ Detenido";
+  $("nStart").textContent=S.arr;$("nLast").textContent=fmt2(S.last);
+  $("deviceStatus").textContent=!S.broker?"ESP32: esperando conexión al broker":
+    !S.deviceId?"ESP32: buscando un equipo online…":
+    !S.online?`ESP32 ${S.deviceId}: offline o sin disponibilidad`:
+    !c?`ESP32 ${S.deviceId}: online; esperando estados`:`ESP32 ${S.deviceId}: online y enviando estados`;
+  const esp=$("espConn"),espTxt=$("espTxt");
+  if(!S.broker){esp.className="badge";espTxt.textContent="ESP32: esperando broker"}
+  else if(!S.deviceId){esp.className="badge";espTxt.textContent="ESP32: buscando equipo…"}
+  else if(!S.online){esp.className="badge err";espTxt.textContent="ESP32 desconectado del broker"}
+  else if(!c){esp.className="badge";espTxt.textContent="ESP32 conectado · esperando estados"}
+  else{esp.className="badge ok";espTxt.textContent="ESP32 conectado al broker"}
+  drawTime();
+}
+function setRed(v){if(S.red===v)return;S.red=v;log(v?"Regresó la red eléctrica":"Se perdió la red eléctrica","red",v?"on":"bad")}
+function setPlanta(v){
+  if(S.planta===v)return;
+  if(v){S.since=S.conn?Date.now():0;S.arr++;S.planta=true;save();log("Planta encendida (arranque "+S.arr+")","planta","pla")}
+  else{const cycle=currentMs();S.acc+=cycle;S.last=cycle;S.since=0;S.planta=false;save();log("Planta apagada · ciclo observado de "+fmt2(cycle),"planta","off")}
+}
+function setConn(cls,txt){$("conn").className="badge "+cls;$("connTxt").textContent=txt}
+
+let client=null,retryTimer=null,wanted=false,generation=0,settings=null,intentando=false,intentoDesde=0,esperaReintento=5000,reintentoPendiente=false;
+const pending=new Map();
+// Reintenta con espera creciente (5 s, 10 s, 20 s ... maximo 60 s) para no martillar al broker si la clave esta mal.
+function retry(g){
+  if(!wanted||g!==generation)return 0;
+  clearTimeout(retryTimer);
+  const ms=esperaReintento;esperaReintento=Math.min(esperaReintento*2,60000);
+  reintentoPendiente=true;
+  retryTimer=setTimeout(()=>{reintentoPendiente=false;attempt(g)},ms);
+  return ms;
+}
+// Traduce el error de la biblioteca MQTT a una causa probable (el texto original queda entre corchetes).
+function explicarFallo(r){
+  const raw=(r&&r.errorMessage)||"sin respuesta";
+  let msg;
+  if(/bad user ?name|return code:?\s*4\b/i.test(raw))msg="Usuario o contraseña incorrectos.";
+  else if(/not authori[sz]ed|return code:?\s*5\b/i.test(raw))msg="El usuario no tiene permiso en el broker.";
+  else if(/AMQJS0001E|timed out/i.test(raw))msg="El broker no respondió a tiempo: revisa Internet y la dirección.";
+  else if(/AMQJS0007E|socket error/i.test(raw))msg="No se pudo llegar al broker: revisa Internet, la dirección y el puerto 8884.";
+  else if(/AMQJS0008I|socket closed/i.test(raw))msg="El broker cerró la conexión: casi siempre es usuario o contraseña incorrectos, o sin permiso. Revisa en HiveMQ (Access Management) que el usuario exista con permiso de publicar y suscribir, y que lo escribiste igual (mayúsculas y espacios).";
+  else msg="revisa usuario, contraseña, dirección y puerto 8884.";
+  return "Conexión fallida: "+msg+" ["+raw+"] Usuario enviado: «"+(settings?settings.user:"")+"».";
+}
+function resetReception(clearId){
+  pauseCounter();S.conn=false;S.broker=false;S.online=false;S.lastMsg=0;
+  S.known.red=false;S.known.planta=false;pending.clear();
+  if(clearId)S.deviceId="";
+  render();
+}
+function applyState(kind,value){
+  const upper=value.toUpperCase();if(upper!=="ON"&&upper!=="OFF")return;
+  const on=upper==="ON";
+  if(!S.known[kind]){S.known[kind]=true;S[kind]=on;return}
+  if(kind==="red")setRed(on);else setPlanta(on);
+}
+function acceptTopic(topic,payload,retained){
+  const match=/^ups\/(esp32-ups-[0-9a-f]{12})\/(red|planta|disponibilidad)$/i.exec(topic);
+  if(!match)return;
+  const id=match[1].toLowerCase(),kind=match[2].toLowerCase(),value=payload.trim();
+  if(settings.deviceId&&id!==settings.deviceId)return;
+  if(!S.deviceId){
+    if(!settings.deviceId){
+      if(kind!=="disponibilidad"||value.toLowerCase()!=="online"){
+        if(kind!=="disponibilidad"){
+          const cached=pending.get(id)||{};cached[kind]=value;pending.set(id,cached);
+        }
+        return;
+      }
+    }
+    S.deviceId=id;log("ESP32 detectado: "+id);
+    const cached=pending.get(id);
+    if(cached){for(const key of ["red","planta"])if(cached[key])applyState(key,cached[key])}
+    pending.clear();
+  }
+  if(id!==S.deviceId)return;
+  S.lastMsg=Date.now();
+  if(kind==="disponibilidad"){
+    const v=value.toLowerCase();
+    if(v!=="online"&&v!=="offline")return;
+    const was=S.online;
+    S.online=v==="online";
+    if(S.online!==was)log("ESP32 "+(S.online?"online":"offline"));
+  }else{
+    // Un estado recibido en vivo (no retenido) prueba que el ESP32 esta publicando
+    // ahora mismo, aunque se haya perdido su aviso "online" o se hubiera dado por
+    // sin senal. Los retenidos son datos viejos y no cuentan.
+    if(!retained&&!S.online){S.online=true;log("ESP32 online (recibiendo estados)")}
+    applyState(kind,value);
+  }
+  syncReady();
+}
+function checkStale(){
+  if(!S.broker||!S.deviceId||!S.online||!S.lastMsg)return;
+  const silencio=Date.now()-S.lastMsg;
+  if(silencio<=STALE_MS)return;
+  pauseCounter(S.lastMsg);
+  S.online=false;
+  log("ESP32 sin señal: no llegan estados desde hace "+Math.round(silencio/1000)+" s");
+  syncReady();
+}
+function attempt(g){
+  if(!wanted||g!==generation)return;
+  const u=settings.url,id="web-ups-"+Math.random().toString(16).slice(2,10);
+  let c;
+  try{c=new Paho.MQTT.Client(u.hostname,Number(u.port),u.pathname,id)}
+  catch(e){$("connError").textContent="No se pudo iniciar el cliente MQTT: "+e.message;setConn("err","Error MQTT");return}
+  client=c;intentando=true;intentoDesde=Date.now();setConn("","Conectando al broker…");
+  c.onMessageArrived=m=>{if(wanted&&g===generation)acceptTopic(m.destinationName,m.payloadString,m.retained)};
+  c.onConnectionLost=r=>{
+    if(!wanted||g!==generation)return;
+    intentando=false;esperaReintento=5000;
+    resetReception(false);setConn("err","Reconectando…");
+    $("connError").textContent="Conexión perdida: "+(r.errorMessage||"sin respuesta");
+    const ms=retry(g);
+    log("Conexión MQTT perdida; reintento en "+Math.round(ms/1000)+" s");
+  };
+  try{c.connect({userName:settings.user,password:settings.pass,useSSL:true,mqttVersion:4,
+    keepAliveInterval:30,timeout:10,
+    onSuccess:()=>{
+      if(!wanted||g!==generation){if(c.isConnected())c.disconnect();return}
+      intentando=false;esperaReintento=5000;
+      resetReception(false);S.broker=true;
+      setConn("ok","Conectado al broker");$("connError").textContent="";
+      log("Conectado al broker MQTT");render();
+      const filter=settings.deviceId?`ups/${settings.deviceId}/+`:"ups/+/+";
+      c.subscribe(filter,{qos:0,onSuccess:()=>log("Suscrito a "+filter),
+        onFailure:r=>{$("connError").textContent="No se pudo suscribir a "+filter+": "+(r.errorMessage||"verifica permisos")}});
+    },
+    onFailure:r=>{
+      if(!wanted||g!==generation)return;
+      intentando=false;
+      resetReception(false);setConn("err","Error MQTT · reintentando");
+      const ms=retry(g);
+      $("connError").textContent=explicarFallo(r)+" Reintento en "+Math.round(ms/1000)+" s.";
+    }});
+  }catch(e){intentando=false;setConn("err","Error MQTT · reintentando");const ms=retry(g);$("connError").textContent=e.message+" Reintento en "+Math.round(ms/1000)+" s."}
+}
+// Para que se quede conectado "todo el tiempo": si el navegador durmio la pagina o cambio la red y
+// no hay conexion ni intento en curso, vuelve a conectar al instante en vez de esperar el reintento.
+// forzar=true (volvio la red o la pestana): intenta ya. forzar=false (vigilante cada 20 s): respeta la espera del reintento.
+function reavivar(forzar){
+  if(!wanted||!settings)return;
+  if(client&&client.isConnected())return;
+  if(intentando&&Date.now()-intentoDesde<30000)return;
+  if(!forzar&&reintentoPendiente)return;
+  if(forzar&&Date.now()-intentoDesde<4000)return;
+  generation++;clearTimeout(retryTimer);reintentoPendiente=false;
+  if(forzar)esperaReintento=5000;
+  try{if(client)client.disconnect()}catch(e){}
+  intentando=false;
+  attempt(generation);
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)reavivar(true)});
+window.addEventListener("online",()=>reavivar(true));
+setInterval(()=>reavivar(false),20000);
+function disconnect(){
+  wanted=false;generation++;clearTimeout(retryTimer);intentando=false;reintentoPendiente=false;esperaReintento=5000;
+  if(client&&client.isConnected())client.disconnect();
+  client=null;settings=null;resetReception(true);
+  $("mqttPass").value="";setConn("","Sin conectar");$("connError").textContent="";
+}
+// "Mantener conectado": usuario y clave quedan solo en este navegador y la pagina conecta sola al abrirse.
+function recordarConexion(user,pass){try{localStorage.setItem("mqttUser",user);localStorage.setItem("mqttPass",pass);localStorage.setItem("mqttAuto","1")}catch(e){}}
+function olvidarConexion(){try{["mqttUser","mqttPass","mqttAuto"].forEach(k=>localStorage.removeItem(k))}catch(e){}}
+$("bConn").onclick=()=>{
+  if(!window.Paho||!Paho.MQTT){toast("No se cargó la biblioteca MQTT. Revisa Internet.");return}
+  let u;try{u=new URL($("url").value.trim())}catch(e){toast("Escribe una URL WebSocket válida");return}
+  if(u.protocol!=="wss:"||!u.hostname||!Number(u.port)||u.pathname!=="/mqtt"){
+    toast("Usa wss://servidor:8884/mqtt");return;
+  }
+  const deviceId=$("deviceId").value.trim().toLowerCase();
+  if(deviceId&&!/^esp32-ups-[0-9a-f]{12}$/.test(deviceId)){
+    toast("Copia el ID MQTT del Monitor serie");return;
+  }
+  const user=$("mqttUser").value.trim(),pass=$("mqttPass").value;
+  if(!user||!pass){toast("Escribe usuario y contraseña MQTT");return}
+  disconnect();$("mqttPass").value=pass;
+  settings={url:u,user,pass,deviceId};wanted=true;S.deviceId=deviceId;
+  try{localStorage.setItem("mqttUrl",u.href);localStorage.setItem("mqttDeviceId",deviceId)}catch(e){}
+  if($("recordar").checked)recordarConexion(user,pass);else olvidarConexion();
+  setConn("","Conectando al broker…");render();attempt(generation);
+};
+$("bDisc").onclick=()=>{if(wanted)log("Conexión MQTT cerrada");disconnect();olvidarConexion()};
+$("bClear").onclick=limpiarLog;
+try{$("url").value=localStorage.getItem("mqttUrl")||$("url").value;
+  $("deviceId").value=localStorage.getItem("mqttDeviceId")||""}catch(e){}
+/* ---------- Historial plegable ---------- */
+const accLog=$("accLog"),bAmpliar=$("bAmpliar");
+function ampliar(v){logEl.classList.toggle("big",v);bAmpliar.textContent=v?"Reducir":"Ampliar";bAmpliar.setAttribute("aria-pressed",String(v))}
+try{
+  accLog.open=localStorage.getItem("logAbierto")!=="0";
+  ampliar(localStorage.getItem("logAmplio")==="1");
+}catch(e){}
+bAmpliar.onclick=()=>{
+  const v=!logEl.classList.contains("big");ampliar(v);
+  try{localStorage.setItem("logAmplio",v?"1":"0")}catch(e){}
+};
+accLog.addEventListener("toggle",()=>{try{localStorage.setItem("logAbierto",accLog.open?"1":"0")}catch(e){}});
+
+/* ---------- Modo administrador ----------
+   Es un candado de comodidad (evita reiniciar el contador o tocar la conexion sin querer).
+   Como esta pagina es publica, quien lea su codigo podria saltarselo: no protege secretos.
+   El acceso es fijo (usuario y clave del broker). La clave no esta escrita en el codigo:
+   solo su huella (PBKDF2-SHA256 con sal), que esta aqui abajo en ADMIN_CONFIG. */
+const dlg=$("dlgLogin"),bAdmin=$("bAdmin"),bReset=$("bReset"),boxReset=$("resetConfirm");
+let esAdmin=false;
+const VERSION_PAGINA="v2.5";
+const ADMIN_CONFIG={v:1,sal:"qxUIVmNTV39ju5TblMm8OQ==",iter:600000,huella:"RAIHHZFvkFMJ7ubdPdawe1V+EvgSWWx6V9pefvTcDYE="};
+const enc=new TextEncoder();
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+// El usuario se normaliza (espacios sobrantes o no separables, tildes escritas de otra forma); distingue mayusculas.
+const limpiarUsuario=s=>s.normalize("NFC").replace(/\s+/g," ").trim();
+async function derivar(usuario,clave,sal,iter){
+  const base=await crypto.subtle.importKey("raw",enc.encode(limpiarUsuario(usuario)+"\u0000"+clave),"PBKDF2",false,["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:sal,iterations:iter,hash:"SHA-256"},base,256));
+}
+const iguales=(a,b)=>{if(a.length!==b.length)return false;let r=0;for(let i=0;i<a.length;i++)r|=a[i]^b[i];return r===0};
+const getNum=k=>{try{return Number(sessionStorage.getItem(k))||0}catch(e){return 0}};
+const setNum=(k,v)=>{try{sessionStorage.setItem(k,String(v))}catch(e){}};
+function setAdmin(v){
+  esAdmin=v;
+  $("admin").hidden=!v;
+  bAdmin.classList.toggle("on",v);
+  $("adminTxt").textContent=v?"Salir de administrador":"Administrador";
+  if(v){toast("Modo administrador activado");$("admin").scrollIntoView({behavior:"smooth",block:"start"})}
+  else cancelarReset();
+}
+const verClave=$("verClave");
+function ocultarClave(){verClave.checked=false;$("admPass").type="password"}
+verClave.onchange=()=>{$("admPass").type=verClave.checked?"text":"password"};
+bAdmin.onclick=()=>{
+  if(esAdmin){setAdmin(false);toast("Modo administrador desactivado");return}
+  $("loginMsg").textContent="";ocultarClave();
+  $("verInfo").textContent="Página "+VERSION_PAGINA;
+  if(typeof dlg.showModal==="function")dlg.showModal();else dlg.setAttribute("open","");
+};
+$("bSalir").onclick=()=>{setAdmin(false);toast("Modo administrador desactivado")};
+$("bCancelarLogin").onclick=()=>dlg.close();
+dlg.addEventListener("close",()=>{$("admPass").value="";ocultarClave();bAdmin.focus({preventScroll:true})});
+$("fLogin").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const msg=$("loginMsg"),btn=$("bEntrar"),cfg=ADMIN_CONFIG;
+  msg.textContent="";
+  if(!(window.crypto&&crypto.subtle)){msg.textContent="Este navegador no puede validar la contraseña aquí (abre la página con https).";return}
+  const resta=Math.ceil((getNum("admBloqueo")-Date.now())/1000);
+  if(resta>0){msg.textContent="Demasiados intentos. Espera "+resta+" s.";return}
+  if(btn.disabled)return;
+  const u=limpiarUsuario($("admUser").value),p=$("admPass").value;
+  btn.disabled=true;
+  let ok=false;
+  try{ok=iguales(await derivar(u,p,unb64(cfg.sal),cfg.iter),unb64(cfg.huella))}
+  catch(err){msg.textContent="No se pudo validar el acceso.";btn.disabled=false;return}
+  btn.disabled=false;
+  if(ok){
+    setNum("admFallos",0);setNum("admBloqueo",0);
+    $("admUser").value="";$("admPass").value="";
+    dlg.close();setAdmin(true);
+    // El acceso de administrador es el mismo del broker: se copia al formulario MQTT para no
+    // escribirlo dos veces. Solo vive en esta pestana y no se hace nada con el si ya hay conexion.
+    if(!wanted){$("mqttUser").value=u;$("mqttPass").value=p}
+    return;
+  }
+  const f=getNum("admFallos")+1;setNum("admFallos",f);
+  if(f>=3){const s=30*(f-2);setNum("admBloqueo",Date.now()+s*1000);msg.textContent="Datos incorrectos. Espera "+s+" s para volver a intentar."}
+  else msg.textContent="Usuario o contraseña incorrectos. Revisa mayúsculas, tildes y espacios del usuario.";
+  $("admPass").value="";$("admPass").focus();
+});
+
+/* Reiniciar contador: primero pide confirmacion en el mismo panel. */
+function pedirReset(){
+  $("rcDetalle").textContent="Se pondrá en cero: "+fmt(S.acc+currentMs())+" de funcionamiento, "+S.arr+(S.arr===1?" arranque":" arranques")+" y el último ciclo ("+fmt2(S.last)+").";
+  $("chkHist").checked=true;boxReset.hidden=false;bReset.hidden=true;$("bResetNo").focus();
+}
+function cancelarReset(){boxReset.hidden=true;bReset.hidden=false}
+function ejecutarReset(){
+  const todo=$("chkHist").checked;
+  S.acc=0;S.arr=0;S.last=0;
+  S.since=(S.conn&&S.planta)?Date.now():0;
+  save();
+  if(todo)limpiarLog();else log("Contador reiniciado por el administrador");
+  cancelarReset();render();
+  toast(todo?"Contador e historial borrados":"Contador reiniciado");
+}
+bReset.onclick=pedirReset;$("bResetNo").onclick=cancelarReset;$("bResetSi").onclick=ejecutarReset;
+
+setInterval(drawTime,200);
+setInterval(checkStale,1000);
+window.addEventListener("beforeunload",()=>{pauseCounter();save()});
+render();
+// Conexion automatica al abrir la pagina si el administrador la dejo guardada.
+try{
+  const gu=localStorage.getItem("mqttUser"),gp=localStorage.getItem("mqttPass");
+  if(localStorage.getItem("mqttAuto")==="1"&&gu&&gp){
+    $("mqttUser").value=gu;$("mqttPass").value=gp;$("recordar").checked=true;
+    setTimeout(()=>$("bConn").click(),0);
+  }
+}catch(e){}
+
+</script>
+</body>
+</html>
